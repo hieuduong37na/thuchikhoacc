@@ -140,6 +140,9 @@ input[type=date],input[type=month]{color-scheme:dark;min-height:44px}
  button.pri:hover:not(:active){filter:brightness(1.12)}
  .item:hover:not(:active) .dot{transform:scale(1.07)}
 }
+.item.amt .dot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.item.amt .dot svg{width:26%}
+.am{font-weight:600;color:var(--c);white-space:nowrap;line-height:1.1}
 #printArea{display:none}
 @media print{
  body{background:#fff;color:#000;display:block;height:auto}.app{display:none}
@@ -296,7 +299,7 @@ const ICON={up:'<path d="M12 19V5M5 12l7-7 7 7"/>',down:'<path d="M12 5v14M5 12l
  bars:'<path d="M5 20V11M12 20V4M19 20v-6"/>',file:'<path d="M6 3h9l4 4v14H6z"/><path d="M12 11v6M9 14l3 3 3-3"/>',
  users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-4 3-6 6.5-6s6.5 2 6.5 6"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14c3 0 4.5 2 4.5 5"/>',
  tag:'<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2"/>'};
-const APPS=[{n:'Khoản chi',i:'up',c:'#ff6a5e',go:'Chi'},{n:'Khoản thu',i:'down',c:'#2fbf71',go:'Thu'},
+const APPS=[{n:'Khoản chi',i:'up',c:'#ff6a5e',go:'Chi',amt:true},{n:'Khoản thu',i:'down',c:'#2fbf71',go:'Thu',amt:true},
             {n:'Tổng hợp',i:'bars',c:'#3d8bff',go:'sum'},{n:'Xuất báo cáo',i:'file',c:'#a66cff',go:'rep'},
             {n:'Danh mục',i:'tag',c:'#f2b21a',go:'cat'},
             {n:'Tài khoản',side:'Quản lý tài khoản',i:'users',c:'#26c6b0',go:'users',admin:true}];
@@ -305,7 +308,10 @@ try{user=JSON.parse(store.get('user')||'null')}catch(e){}
 
 /* ---- điều hướng ---- */
 function updateCore(){const t=sumOf(rows,'Thu')-sumOf(rows,'Chi'),el=$('coreBal'),x=money(t);
-  el.textContent=x;el.classList.toggle('neg',t<0);el.style.fontSize=(x.length<=9?16:x.length<=12?13:x.length<=15?11:10)*(matchMedia('(min-width:900px)').matches?1.6:1)+'px'}
+  el.textContent=x;el.classList.toggle('neg',t<0);
+  const kd=matchMedia('(min-width:900px)').matches?1.5:1;
+  document.querySelectorAll('[data-amt]').forEach(e=>{const y=money(sumOf(rows,e.dataset.amt));e.textContent=y;e.style.fontSize=(y.length<=9?13:y.length<=11?12:y.length<=13?10.5:8.5)*kd+'px'});
+  el.style.fontSize=(x.length<=9?16:x.length<=12?13:x.length<=15?11:10)*(matchMedia('(min-width:900px)').matches?1.6:1)+'px'}
 try{matchMedia('(min-width:900px)').addEventListener('change',()=>updateCore())}catch(e){}
 function show(v){
   document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on',x.id==='v-'+v));
@@ -331,12 +337,13 @@ function buildStage(){
   document.querySelectorAll('#stage .item').forEach(x=>x.remove());
   const list=APPS.filter(a=>!a.admin||(user&&user.role==='admin'));
   list.forEach((a,k)=>{const ang=(-90+k*360/list.length)*Math.PI/180,R=37,b=document.createElement('button');
-    b.className='item';b.style.cssText=`left:${50+R*Math.cos(ang)}%;top:${50+R*Math.sin(ang)}%;--c:${a.c}`;
-    b.innerHTML=`<span class="dot"><svg class="i" viewBox="0 0 24 24">${ICON[a.i]}</svg></span><span class="lbl">${a.n}</span>`;
+    b.className='item'+(a.amt?' amt':'');b.style.cssText=`left:${50+R*Math.cos(ang)}%;top:${50+R*Math.sin(ang)}%;--c:${a.c}${a.amt?';width:25%':''}`;
+    b.innerHTML=`<span class="dot"><svg class="i" viewBox="0 0 24 24">${ICON[a.i]}</svg>${a.amt?`<span class="am" data-amt="${a.go}"></span>`:''}</span><span class="lbl">${a.n}</span>`;
     b.onclick=()=>go(a.go);$('stage').appendChild(b)});
   $('side').innerHTML='';
   (user?list:[]).forEach(a=>{const b=document.createElement('button');b.className='tab stab';b.dataset.k=a.go;
     b.innerHTML=`<svg class="i" viewBox="0 0 24 24">${ICON[a.i]}</svg>${esc(a.side||a.n)}`;b.onclick=()=>go(a.go);$('side').appendChild(b)});
+  updateCore();
 }
 document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>b.dataset.tab==='acc'&&user?show('home'):show(b.dataset.tab));
@@ -681,6 +688,8 @@ document.addEventListener('pointerdown',e=>{
   s.style.cssText=`width:${d}px;height:${d}px;left:${e.clientX-r.left-d/2}px;top:${e.clientY-r.top-d/2}px`;
   h.appendChild(s);setTimeout(()=>s.remove(),600)});
 fillSaved();refreshAuth();load();
+if(user)show('home');
+else if(API&&getCred())relogin().then(ok=>{if(ok){refreshAuth();show('home')}});
 </script>
 </body>
 </html>
