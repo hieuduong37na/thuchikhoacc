@@ -97,6 +97,13 @@ button:disabled{cursor:progress}
 .acts{display:flex;gap:6px;flex-wrap:wrap}
 .tag{display:inline-block;font-size:11px;padding:1px 9px;border-radius:10px;border:1px solid var(--line);margin:4px 0}
 .st-active{color:var(--in);border-color:var(--in)}.st-locked{color:#f2b21a;border-color:#f2b21a}.st-hidden{color:var(--mute)}
+input[type=date],input[type=month]{color-scheme:dark;min-height:44px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+.chip{padding:6px 12px;border:1px solid var(--line);border-radius:16px;background:transparent;font-size:12px;cursor:pointer}
+.core{width:36%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0 6px}
+.core .cl{font-size:11px;color:var(--mute)}
+.core b{font-size:15px;line-height:1.2}
+.core b.neg{color:#ff9a90}
 #printArea{display:none}
 @media print{
  body{background:#fff;color:#000;display:block;height:auto}.app{display:none}
@@ -127,7 +134,7 @@ button:disabled{cursor:progress}
   <!-- Ứng dụng: chỉ tài khoản đã đăng nhập -->
   <section class="view" id="v-home">
     <div class="who homebar"><span id="hWho"></span><span style="display:flex;gap:6px"><button id="btnOut">Đăng xuất</button></span></div>
-    <div class="stage" id="stage"><div class="core"><b>Thu chi<br>nội bộ khoa</b></div></div>
+    <div class="stage" id="stage"><div class="core" aria-live="polite"><span class="cl">Tồn quỹ</span><b id="coreBal">0 đ</b></div></div>
   </section>
 
   <section class="view" id="v-form">
@@ -161,16 +168,23 @@ button:disabled{cursor:progress}
   <section class="view" id="v-rep">
     <div class="top"><button class="back" data-go="home">Quay lại</button><h2>Xuất báo cáo</h2></div>
     <div class="two">
-      <div><label for="rFrom">Từ ngày</label><input type="date" id="rFrom"></div>
-      <div><label for="rTo">Đến ngày</label><input type="date" id="rTo"></div>
+      <div><label for="rFrom">Từ ngày (bấm để mở lịch)</label><input type="date" id="rFrom"></div>
+      <div><label for="rTo">Đến ngày (bấm để mở lịch)</label><input type="date" id="rTo"></div>
+    </div>
+    <div class="chips">
+      <button class="chip" data-r="month">Tháng này</button><button class="chip" data-r="prev">Tháng trước</button>
+      <button class="chip" data-r="quarter">Quý này</button><button class="chip" data-r="year">Năm nay</button><button class="chip" data-r="all">Tất cả</button>
     </div>
     <div class="sum" style="margin-top:16px">
-      <div class="box"><small>Số khoản</small><b id="rCount"></b></div>
-      <div class="box"><small>Còn lại</small><b id="rBal"></b></div>
+      <div class="box"><small>Tồn đầu kỳ</small><b id="rOpen"></b></div>
+      <div class="box"><small>Tổng thu</small><b class="in" id="rIn"></b></div>
+      <div class="box"><small>Tổng chi</small><b class="out" id="rOut"></b></div>
+      <div class="box"><small>Tồn cuối kỳ</small><b id="rClose"></b></div>
     </div>
-    <button class="pri" id="btnCsv">Tải file Excel (.csv)</button>
+    <div class="msg" id="rMsg" role="alert"></div>
+    <button class="pri" id="btnXlsx">Tải file Excel (.xlsx)</button>
     <button class="pri" id="btnPrint" style="background:transparent;border:1px solid var(--line)">In hoặc lưu PDF</button>
-    <div class="status">Khi in, chọn "Lưu dưới dạng PDF" ở phần máy in để lưu thành file PDF.</div>
+    <div class="status">File Excel gồm 2 trang tính: "Báo cáo" (tồn quỹ, các khoản thu, các khoản chi) và "Sổ quỹ" (thu chi theo ngày kèm tồn quỹ sau mỗi khoản). Lần đầu xuất cần có mạng để tải thư viện tạo file.</div>
   </section>
 
   <section class="view" id="v-cat">
@@ -250,18 +264,21 @@ let API=DEFAULT_API,rows=[],type='Chi',pending=null,user=null;
 try{user=JSON.parse(store.get('user')||'null')}catch(e){}
 
 /* ---- điều hướng ---- */
+function updateCore(){const t=sumOf(rows,'Thu')-sumOf(rows,'Chi'),el=$('coreBal'),x=money(t);
+  el.textContent=x;el.classList.toggle('neg',t<0);el.style.fontSize=x.length>15?'11px':x.length>12?'13px':'15px'}
 function show(v){
   document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on',x.id==='v-'+v));
   const t=v==='dash'?'dash':'acc';
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.tab===t));
   if(v==='dash')renderDash();
+  updateCore();
 }
 function needLogin(k,note){pending=k;$('lMsg').textContent=note||'Đăng nhập để dùng chức năng này.';show('acc');refreshAuth()}
 function go(k){
   if(!user)return needLogin(k);
   if(k==='Chi'||k==='Thu')openForm(k);
   else if(k==='sum'){show('sum');renderSum()}
-  else if(k==='rep'){show('rep');renderRep()}
+  else if(k==='rep'){show('rep');if(!$('rFrom').value&&!$('rTo').value)setRange('month');else renderRep();loadExcelJS().catch(()=>{})}
   else if(k==='cat'){cEdit=null;$('cMsg').textContent='';show('cat');renderCat()}
   else if(k==='users'){if(user.role!=='admin')return;resetUserForm();show('users');loadUsers()}
   else show(k);
@@ -395,6 +412,7 @@ function renderDash(){
   const m=$('dMonth').value||curM,f=rows.filter(r=>r.date.startsWith(m)).sort((a,b)=>b.date.localeCompare(a.date));
   const i=sumOf(f,'Thu'),o=sumOf(f,'Chi');
   $('dIn').textContent=money(i);$('dOut').textContent=money(o);$('dBal').textContent=money(i-o);$('dBal').className=i-o<0?'out':'in';
+  updateCore();
   $('dRows').innerHTML=f.length?f.map(r=>`<tr><td>${dmy(r.date).slice(0,5)}</td><td>${esc(r.reason)}<small>${esc(r.cat)}${r.invoice?' · HĐ '+esc(r.invoice):''}${r.by?' · '+esc(r.by):''}</small></td>
     <td class="n ${r.type==='Thu'?'in':'out'}">${r.type==='Thu'?'+':'−'}${money(r.amount)}</td></tr>`).join('')
     :'<tr><td colspan="3" class="empty">Tháng này chưa có khoản thu chi nào.</td></tr>';
@@ -484,22 +502,126 @@ function renderSum(){const m=$('sMonth').value,f=rows.filter(r=>!m||r.date.start
 $('sMonth').onchange=renderSum;
 
 /* ---- báo cáo ---- */
+const openBal=a=>{if(!a)return 0;const p=rows.filter(r=>r.date<a);return sumOf(p,'Thu')-sumOf(p,'Chi')};
 function repRows(){const a=$('rFrom').value,b=$('rTo').value;return rows.filter(r=>(!a||r.date>=a)&&(!b||r.date<=b)).sort((x,y)=>x.date.localeCompare(y.date))}
-function renderRep(){const f=repRows(),bal=sumOf(f,'Thu')-sumOf(f,'Chi');$('rCount').textContent=f.length;$('rBal').textContent=money(bal);$('rBal').className=bal<0?'out':'in'}
+function renderRep(){const a=$('rFrom').value,f=repRows(),op=openBal(a),i=sumOf(f,'Thu'),o=sumOf(f,'Chi'),c=op+i-o;
+  $('rOpen').textContent=money(op);$('rIn').textContent=money(i);$('rOut').textContent=money(o);$('rClose').textContent=money(c);$('rClose').className=c<0?'out':'in';$('rMsg').textContent=''}
 ['rFrom','rTo'].forEach(i=>$(i).onchange=renderRep);
-$('btnCsv').onclick=()=>{const f=repRows();if(!f.length){alert('Chưa có khoản nào trong khoảng ngày này.');return}
-  const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+function setRange(k){const n=new Date(),y=n.getFullYear(),m=n.getMonth(),iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');let a,b;
+  if(k==='month'){a=new Date(y,m,1);b=new Date(y,m+1,0)}
+  else if(k==='prev'){a=new Date(y,m-1,1);b=new Date(y,m,0)}
+  else if(k==='quarter'){const q=Math.floor(m/3)*3;a=new Date(y,q,1);b=new Date(y,q+3,0)}
+  else if(k==='year'){a=new Date(y,0,1);b=new Date(y,11,31)}
+  else{$('rFrom').value='';$('rTo').value='';renderRep();return}
+  $('rFrom').value=iso(a);$('rTo').value=iso(b);renderRep()}
+document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>setRange(b.dataset.r));
+document.querySelectorAll('input[type=date],input[type=month]').forEach(i=>i.addEventListener('click',()=>{try{i.showPicker&&i.showPicker()}catch(e){}}));
+
+/*BUILD_START*/
+function buildWorkbook(ExcelJS,rows,from,to){
+  const dmy=d=>d.split('-').reverse().join('/');
+  const dt=d=>{const [y,m,x]=d.split('-').map(Number);return new Date(Date.UTC(y,m-1,x))};
+  const sum=a=>a.reduce((s,r)=>s+Number(r.amount||0),0);
+  const before=from?rows.filter(r=>r.date<from):[];
+  const opening=sum(before.filter(r=>r.type==='Thu'))-sum(before.filter(r=>r.type==='Chi'));
+  const f=rows.filter(r=>(!from||r.date>=from)&&(!to||r.date<=to)).sort((x,y)=>x.date.localeCompare(y.date));
+  const thu=f.filter(r=>r.type==='Thu'),chi=f.filter(r=>r.type==='Chi'),tin=sum(thu),tout=sum(chi);
+  const period=from||to?'Từ ngày '+(from?dmy(from):'đầu')+' đến ngày '+(to?dmy(to):'nay'):'Toàn bộ thời gian';
+  const wb=new ExcelJS.Workbook();wb.creator='Thu chi nội bộ khoa';wb.created=new Date();
+  const line={style:'thin',color:{argb:'FF9AA5B1'}},bd={top:line,left:line,bottom:line,right:line};
+  const gray={type:'pattern',pattern:'solid',fgColor:{argb:'FFE9EDF1'}},red={type:'pattern',pattern:'solid',fgColor:{argb:'FFC8141F'}};
+  const MONEY='#,##0',page={orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9};
+  const head=(ws,cols,t)=>{ws.mergeCells(`A1:${cols}1`);const a=ws.getCell('A1');a.value=t;a.font={bold:true,size:16};a.alignment={horizontal:'center'};
+    ws.mergeCells(`A2:${cols}2`);const b=ws.getCell('A2');b.value=period;b.font={italic:true};b.alignment={horizontal:'center'}};
+  const bar=(ws,row,t,cols)=>{ws.mergeCells(`A${row}:${cols}${row}`);const c=ws.getCell(`A${row}`);c.value=t;c.font={bold:true,size:12,color:{argb:'FFFFFFFF'}};c.fill=red;c.alignment={vertical:'middle'};ws.getRow(row).height=22};
+
+  /* ----- Trang 1: Báo cáo ----- */
+  const ws=wb.addWorksheet('Báo cáo',{pageSetup:page});
+  ws.columns=[{width:6},{width:12},{width:24},{width:38},{width:16},{width:20},{width:18},{width:28}];
+  head(ws,'H','BÁO CÁO THU CHI NỘI BỘ KHOA');
+  bar(ws,4,'TỒN QUỸ','H');
+  const lab=(row,t,bold)=>{ws.mergeCells(`A${row}:F${row}`);const c=ws.getCell(`A${row}`);c.value=t;c.font={bold:!!bold};c.border=bd;
+    const v=ws.getCell(`G${row}`);v.numFmt=MONEY;v.border=bd;v.font={bold:!!bold}};
+  lab(5,'Tồn đầu kỳ');lab(6,'Cộng thu trong kỳ');lab(7,'Cộng chi trong kỳ');lab(8,'Tồn cuối kỳ',true);
+  ws.getCell('G5').value=opening;
+  ws.getCell('G8').value={formula:'G5+G6-G7',result:opening+tin-tout};
+  ws.getCell('A8').fill=gray;ws.getCell('G8').fill=gray;
+
+  function table(start,title,arr,isThu){
+    bar(ws,start,title,'H');const h=start+1;
+    ['STT',isThu?'Ngày thu':'Ngày chi','Danh mục',isThu?'Nguồn thu, lý do':'Lý do chi',isThu?'Số chứng từ':'Số hóa đơn','Người thực hiện','Số tiền','Ghi chú'].forEach((t,i)=>{
+      const c=ws.getCell(h,i+1);c.value=t;c.font={bold:true};c.fill=gray;c.border=bd;c.alignment={horizontal:'center',vertical:'middle',wrapText:true}});
+    let row=h+1;
+    arr.forEach((x,i)=>{
+      [i+1,dt(x.date),x.cat,x.reason,x.invoice||'',x.by||'',Number(x.amount),x.note||''].forEach((v,j)=>{
+        const c=ws.getCell(row,j+1);c.value=v;c.border=bd;
+        c.alignment={vertical:'top',wrapText:j===3||j===7,horizontal:j<2?'center':(j===6?'right':'left')}});
+      ws.getCell(row,2).numFmt='dd/mm/yyyy';ws.getCell(row,7).numFmt=MONEY;row++});
+    if(!arr.length){ws.mergeCells(`A${row}:H${row}`);const c=ws.getCell(`A${row}`);c.value='(Không có khoản nào trong kỳ)';
+      c.font={italic:true,color:{argb:'FF777777'}};c.alignment={horizontal:'center'};c.border=bd;row++}
+    const first=h+1,last=row-1;
+    ws.mergeCells(`A${row}:F${row}`);const t=ws.getCell(`A${row}`);t.value=isThu?'Cộng khoản thu':'Cộng khoản chi';t.font={bold:true};t.alignment={horizontal:'right'};
+    for(let k=1;k<=8;k++){const c=ws.getCell(row,k);c.border=bd;c.fill=gray}
+    const tc=ws.getCell(row,7);tc.value=arr.length?{formula:`SUM(G${first}:G${last})`,result:sum(arr)}:0;tc.numFmt=MONEY;tc.font={bold:true};
+    return {total:row,next:row+2}}
+  const t1=table(10,'I. CÁC KHOẢN THU',thu,true);
+  const t2=table(t1.next,'II. CÁC KHOẢN CHI',chi,false);
+  ws.getCell('G6').value={formula:`G${t1.total}`,result:tin};
+  ws.getCell('G7').value={formula:`G${t2.total}`,result:tout};
+
+  /* ----- Trang 2: Sổ quỹ ----- */
+  const w2=wb.addWorksheet('Sổ quỹ',{pageSetup:page,views:[{state:'frozen',ySplit:4}]});
+  w2.columns=[{width:12},{width:16},{width:46},{width:8},{width:18},{width:18},{width:20}];
+  head(w2,'G','SỔ QUỸ THU CHI');
+  ['Ngày','Số chứng từ','Diễn giải','Loại','Thu','Chi','Tồn quỹ'].forEach((t,i)=>{
+    const c=w2.getCell(4,i+1);c.value=t;c.font={bold:true};c.fill=gray;c.border=bd;c.alignment={horizontal:'center'}});
+  w2.mergeCells('A5:F5');w2.getCell('A5').value='Tồn đầu kỳ';w2.getCell('A5').font={bold:true};
+  w2.getCell('G5').value=opening;w2.getCell('G5').numFmt=MONEY;w2.getCell('G5').font={bold:true};
+  for(let k=1;k<=7;k++)w2.getCell(5,k).border=bd;
+  let bal=opening,row=6;
+  f.forEach(x=>{const a=Number(x.amount),isT=x.type==='Thu';bal+=isT?a:-a;
+    const vals=[dt(x.date),x.invoice||'',x.reason+(x.cat?' ('+x.cat+')':''),x.type,isT?a:null,isT?null:a,{formula:`G${row-1}+E${row}-F${row}`,result:bal}];
+    vals.forEach((v,j)=>{const c=w2.getCell(row,j+1);c.value=v;c.border=bd;c.alignment={vertical:'top',wrapText:j===2,horizontal:j===0||j===3?'center':(j>3?'right':'left')}});
+    w2.getCell(row,1).numFmt='dd/mm/yyyy';[5,6,7].forEach(k=>w2.getCell(row,k).numFmt=MONEY);row++});
+  const first=6,last=row-1;
+  w2.mergeCells(`A${row}:D${row}`);w2.getCell(`A${row}`).value='Cộng phát sinh và tồn cuối kỳ';w2.getCell(`A${row}`).font={bold:true};w2.getCell(`A${row}`).alignment={horizontal:'right'};
+  w2.getCell(row,5).value=f.length?{formula:`SUM(E${first}:E${last})`,result:tin}:0;
+  w2.getCell(row,6).value=f.length?{formula:`SUM(F${first}:F${last})`,result:tout}:0;
+  w2.getCell(row,7).value={formula:`G5+E${row}-F${row}`,result:opening+tin-tout};
+  for(let k=1;k<=7;k++){const c=w2.getCell(row,k);c.border=bd;c.fill=gray;if(k>4){c.numFmt=MONEY;c.font={bold:true}}}
+  return wb;
+}
+/*BUILD_END*/
+function loadScript(src){return new Promise((res,rej)=>{const e=document.createElement('script');e.src=src;e.onload=res;e.onerror=()=>rej(new Error('load'));document.head.appendChild(e)})}
+async function loadExcelJS(){if(window.ExcelJS)return;
+  for(const u of ['https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js','https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js']){
+    try{await loadScript(u);if(window.ExcelJS)return}catch(e){}}
+  throw new Error('exceljs')}
+function csvExport(f){const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"',a=$('rFrom').value,op=openBal(a);
   const L=[['Ngày','Loại','Danh mục','Lý do','Số tiền','Số hóa đơn','Người thực hiện','Ghi chú'].map(q).join(',')];
   f.forEach(r=>L.push([dmy(r.date),r.type,r.cat,r.reason,r.amount,r.invoice,r.by,r.note].map(q).join(',')));
-  L.push('',['','','','Tổng thu',sumOf(f,'Thu')].map(q).join(','),['','','','Tổng chi',sumOf(f,'Chi')].map(q).join(','),['','','','Còn lại',sumOf(f,'Thu')-sumOf(f,'Chi')].map(q).join(','));
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+L.join('\r\n')],{type:'text/csv;charset=utf-8'}));
-  a.download='bao-cao-thu-chi.csv';document.body.appendChild(a);a.click();a.remove()};
-$('btnPrint').onclick=()=>{const f=repRows();if(!f.length){alert('Chưa có khoản nào trong khoảng ngày này.');return}
-  const i=sumOf(f,'Thu'),o=sumOf(f,'Chi'),a=$('rFrom').value,b=$('rTo').value;
+  L.push('',['','','','Tồn đầu kỳ',op].map(q).join(','),['','','','Tổng thu',sumOf(f,'Thu')].map(q).join(','),['','','','Tổng chi',sumOf(f,'Chi')].map(q).join(','),['','','','Tồn cuối kỳ',op+sumOf(f,'Thu')-sumOf(f,'Chi')].map(q).join(','));
+  const l=document.createElement('a');l.href=URL.createObjectURL(new Blob(['\ufeff'+L.join('\r\n')],{type:'text/csv;charset=utf-8'}));
+  l.download='bao-cao-thu-chi.csv';document.body.appendChild(l);l.click();l.remove()}
+$('btnXlsx').onclick=async()=>{
+  const a=$('rFrom').value,b=$('rTo').value,btn=$('btnXlsx');$('rMsg').className='msg';
+  if(a&&b&&a>b){$('rMsg').textContent='Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.';return}
+  const f=repRows();
+  if(!f.length&&!openBal(a)){$('rMsg').textContent='Không có dữ liệu trong khoảng ngày này.';return}
+  btn.disabled=true;btn.textContent='Đang tạo file Excel...';
+  try{await loadExcelJS();const buf=await buildWorkbook(window.ExcelJS,rows,a,b).xlsx.writeBuffer();
+    const k=x=>x?x.replace(/-/g,''):'';const l=document.createElement('a');
+    l.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+    l.download='bao-cao-thu-chi'+(a||b?'_'+(k(a)||'dau')+'_'+(k(b)||'nay'):'')+'.xlsx';document.body.appendChild(l);l.click();l.remove();
+    $('rMsg').className='msg ok';$('rMsg').textContent='Đã tạo file Excel.'}
+  catch(e){csvExport(f);$('rMsg').textContent='Chưa tạo được file .xlsx (cần kết nối mạng để tải thư viện). Đã tải file .csv thay thế.'}
+  finally{btn.disabled=false;btn.textContent='Tải file Excel (.xlsx)'}};
+$('btnPrint').onclick=()=>{const f=repRows();if(!f.length&&!openBal($('rFrom').value)){alert('Chưa có khoản nào trong khoảng ngày này.');return}
+  const i=sumOf(f,'Thu'),o=sumOf(f,'Chi'),a=$('rFrom').value,b=$('rTo').value,op=openBal(a);
   $('printArea').innerHTML=`<h1>Báo cáo thu chi nội bộ khoa</h1><div>${a||b?'Từ '+(a?dmy(a):'đầu')+' đến '+(b?dmy(b):'nay'):'Toàn bộ thời gian'}</div>
   <table><thead><tr><th>Ngày</th><th>Loại</th><th>Danh mục</th><th>Lý do</th><th>Số hóa đơn</th><th class="n">Số tiền</th></tr></thead><tbody>
   ${f.map(r=>`<tr><td>${dmy(r.date)}</td><td>${r.type}</td><td>${esc(r.cat)}</td><td>${esc(r.reason)}</td><td>${esc(r.invoice)}</td><td class="n">${money(r.amount)}</td></tr>`).join('')}
-  </tbody></table><p><b>Tổng thu:</b> ${money(i)} &nbsp; <b>Tổng chi:</b> ${money(o)} &nbsp; <b>Còn lại:</b> ${money(i-o)}</p>`;
+  </tbody></table><p><b>Tồn đầu kỳ:</b> ${money(op)} &nbsp; <b>Tổng thu:</b> ${money(i)} &nbsp; <b>Tổng chi:</b> ${money(o)} &nbsp; <b>Tồn cuối kỳ:</b> ${money(op+i-o)}</p>`;
   window.print()};
 
 document.addEventListener('pointerdown',e=>{
