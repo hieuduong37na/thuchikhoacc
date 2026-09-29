@@ -21,7 +21,7 @@ main{flex:1;min-height:0}
 #v-home{position:relative}
 #v-home.on{display:flex;align-items:center;justify-content:center}
 .homebar{position:absolute;top:14px;left:16px;right:16px;margin:0}
-.stage{position:relative;width:min(88vw,380px);aspect-ratio:1}
+.stage{position:relative;width:min(94vw,400px);aspect-ratio:1}
 .core{position:absolute;left:50%;top:50%;width:28%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
  background:radial-gradient(circle at 50% 40%,#2a0d10,#0d0507 70%);border:2px solid var(--glow);
  box-shadow:0 0 24px 4px rgba(255,42,58,.55),inset 0 0 22px rgba(255,42,58,.35);display:grid;place-items:center;animation:pulse 3.6s ease-in-out infinite;text-align:center}
@@ -143,6 +143,10 @@ input[type=date],input[type=month]{color-scheme:dark;min-height:44px}
 .item.amt .dot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
 .item.amt .dot svg{width:26%}
 .am{font-weight:600;color:var(--c);white-space:nowrap;line-height:1.1}
+.sv{flex-wrap:wrap}.sv .nm{flex:1 1 55%}.sv .a{font-weight:600;white-space:nowrap}.sv .acts{flex:1 1 100%}
+.st-over{color:var(--out);border-color:var(--out)}
+dialog{border:1px solid var(--line);border-radius:14px;background:#160a0d;color:var(--txt);width:min(92vw,420px);padding:18px}
+dialog::backdrop{background:rgba(0,0,0,.65)}
 #printArea{display:none}
 @media print{
  body{background:#fff;color:#000;display:block;height:auto}.app{display:none}
@@ -226,6 +230,40 @@ input[type=date],input[type=month]{color-scheme:dark;min-height:44px}
     <div class="status">File Excel gồm 2 trang tính: "Báo cáo" (tồn quỹ, các khoản thu, các khoản chi) và "Sổ quỹ" (thu chi theo ngày kèm tồn quỹ sau mỗi khoản). Lần đầu xuất cần có mạng để tải thư viện tạo file.</div>
   </section>
 
+  <section class="view" id="v-sav">
+    <div class="top"><button class="back" data-go="home">Quay lại</button><h2>Gửi tiết kiệm</h2></div>
+    <div class="sum">
+      <div class="box"><small>Đang gửi</small><b id="vTotal"></b></div>
+      <div class="box"><small>Lãi dự kiến (các sổ đang gửi)</small><b class="in" id="vInt"></b></div>
+      <div class="box wide"><small>Đáo hạn gần nhất</small><b id="vNext" style="font-size:16px"></b></div>
+    </div>
+    <div class="cols">
+      <div>
+        <div class="seg"><button id="vTabOpen" class="on">Đang gửi</button><button id="vTabClosed">Đã tất toán</button></div>
+        <div class="msg" id="vMsg" role="alert"></div>
+        <div id="vList"></div>
+      </div>
+      <div id="vForm">
+        <h3 id="vFormTitle">Thêm sổ tiết kiệm</h3>
+        <label for="sBank">Ngân hàng</label><input id="sBank" autocomplete="off" maxlength="80" placeholder="Ví dụ: Vietcombank">
+        <div class="two">
+          <div><label for="sBook">Số sổ (nếu có)</label><input id="sBook" autocomplete="off"></div>
+          <div><label for="sStart">Ngày gửi</label><input type="date" id="sStart"></div>
+        </div>
+        <label for="sAmt">Số tiền gửi (đồng)</label><input id="sAmt" type="number" min="0" step="100000" inputmode="numeric">
+        <div class="two">
+          <div><label for="sRate">Lãi suất (%/năm)</label><input id="sRate" type="number" min="0" max="100" step="0.01" inputmode="decimal"></div>
+          <div><label for="sTerm">Kỳ hạn (tháng)</label><input id="sTerm" type="number" min="1" max="600" step="1" inputmode="numeric"></div>
+        </div>
+        <div class="box" style="margin-top:12px"><small id="sCalc"></small></div>
+        <label for="sNote">Ghi chú</label><textarea id="sNote" rows="2"></textarea>
+        <div class="msg" id="sMsg" role="alert"></div>
+        <button class="pri" id="btnSavSave">Lưu sổ tiết kiệm</button>
+        <button class="pri" id="btnSavCancel" style="display:none;background:transparent;border:1px solid var(--line)">Hủy sửa</button>
+      </div>
+    </div>
+  </section>
+
   <section class="view" id="v-cat">
     <div class="top"><button class="back" data-go="home">Quay lại</button><h2>Danh mục</h2></div>
     <div class="seg"><button id="cTabChi" class="on">Khoản chi</button><button id="cTabThu">Khoản thu</button></div>
@@ -279,6 +317,17 @@ input[type=date],input[type=month]{color-scheme:dark;min-height:44px}
 </nav>
 </div>
 <div id="printArea"></div>
+<dialog id="dSet">
+  <h3 style="margin-top:0">Tất toán sổ tiết kiệm</h3>
+  <div class="status" id="dSetInfo" style="margin-top:0"></div>
+  <label for="dDate">Ngày tất toán</label><input type="date" id="dDate">
+  <label for="dInt">Lãi thực nhận (đồng)</label><input id="dInt" type="number" min="0" step="1000" inputmode="numeric">
+  <div class="msg" id="dMsg" role="alert"></div>
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <button class="pri" id="dOk" style="flex:1;width:auto;margin:0">Xác nhận</button>
+    <button class="pri" id="dCancel" style="flex:1;width:auto;margin:0;background:transparent;border:1px solid var(--line)">Hủy</button>
+  </div>
+</dialog>
 
 <script>
 // ĐƯỜNG DẪN GOOGLE SHEET: dán đường dẫn Web app (kết thúc bằng /exec) vào giữa hai dấu nháy bên dưới.
@@ -298,8 +347,10 @@ const TXT={Chi:{t:'Khoản chi',d:'Ngày chi',r:'Lý do chi',i:'Số hóa đơn 
 const ICON={up:'<path d="M12 19V5M5 12l7-7 7 7"/>',down:'<path d="M12 5v14M5 12l7 7 7-7"/>',
  bars:'<path d="M5 20V11M12 20V4M19 20v-6"/>',file:'<path d="M6 3h9l4 4v14H6z"/><path d="M12 11v6M9 14l3 3 3-3"/>',
  users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-4 3-6 6.5-6s6.5 2 6.5 6"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14c3 0 4.5 2 4.5 5"/>',
+ bank:'<path d="M3 10l9-6 9 6z"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 21h18"/>',
  tag:'<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2"/>'};
 const APPS=[{n:'Khoản chi',i:'up',c:'#ff6a5e',go:'Chi',amt:true},{n:'Khoản thu',i:'down',c:'#2fbf71',go:'Thu',amt:true},
+            {n:'Gửi tiết kiệm',i:'bank',c:'#ff8fb1',go:'sav',amt:true},
             {n:'Tổng hợp',i:'bars',c:'#3d8bff',go:'sum'},{n:'Xuất báo cáo',i:'file',c:'#a66cff',go:'rep'},
             {n:'Danh mục',i:'tag',c:'#f2b21a',go:'cat'},
             {n:'Tài khoản',side:'Quản lý tài khoản',i:'users',c:'#26c6b0',go:'users',admin:true}];
@@ -310,7 +361,7 @@ try{user=JSON.parse(store.get('user')||'null')}catch(e){}
 function updateCore(){const t=sumOf(rows,'Thu')-sumOf(rows,'Chi'),el=$('coreBal'),x=money(t);
   el.textContent=x;el.classList.toggle('neg',t<0);
   const kd=matchMedia('(min-width:900px)').matches?1.5:1;
-  document.querySelectorAll('[data-amt]').forEach(e=>{const y=money(sumOf(rows,e.dataset.amt));e.textContent=y;e.style.fontSize=(y.length<=9?13:y.length<=11?12:y.length<=13?10.5:8.5)*kd+'px'});
+  document.querySelectorAll('[data-amt]').forEach(e=>{const y=money(e.dataset.amt==='sav'?savTotal():sumOf(rows,e.dataset.amt));e.textContent=y;e.style.fontSize=(y.length<=9?13:y.length<=11?12:y.length<=13?10.5:8.5)*kd+'px'});
   el.style.fontSize=(x.length<=9?16:x.length<=12?13:x.length<=15?11:10)*(matchMedia('(min-width:900px)').matches?1.6:1)+'px'}
 try{matchMedia('(min-width:900px)').addEventListener('change',()=>updateCore())}catch(e){}
 function show(v){
@@ -329,6 +380,7 @@ function go(k){
   if(k==='Chi'||k==='Thu')openForm(k);
   else if(k==='sum'){show('sum');renderSum()}
   else if(k==='rep'){show('rep');if(!$('rFrom').value&&!$('rTo').value)setRange('month');else renderRep();loadExcelJS().catch(()=>{})}
+  else if(k==='sav'){vTab='open';resetSavForm();show('sav');renderSav();loadSavings().then(renderSav)}
   else if(k==='cat'){cEdit=null;$('cMsg').textContent='';show('cat');renderCat()}
   else if(k==='users'){if(user.role!=='admin')return;resetUserForm();show('users');loadUsers()}
   else show(k);
@@ -336,7 +388,7 @@ function go(k){
 function buildStage(){
   document.querySelectorAll('#stage .item').forEach(x=>x.remove());
   const list=APPS.filter(a=>!a.admin||(user&&user.role==='admin'));
-  list.forEach((a,k)=>{const ang=(-90+k*360/list.length)*Math.PI/180,R=37,b=document.createElement('button');
+  list.forEach((a,k)=>{const ang=(-90+k*360/list.length)*Math.PI/180,R=38.5,b=document.createElement('button');
     b.className='item'+(a.amt?' amt':'');b.style.cssText=`left:${50+R*Math.cos(ang)}%;top:${50+R*Math.sin(ang)}%;--c:${a.c}${a.amt?';width:25%':''}`;
     b.innerHTML=`<span class="dot"><svg class="i" viewBox="0 0 24 24">${ICON[a.i]}</svg>${a.amt?`<span class="am" data-amt="${a.go}"></span>`:''}</span><span class="lbl">${a.n}</span>`;
     b.onclick=()=>go(a.go);$('stage').appendChild(b)});
@@ -367,7 +419,7 @@ async function post(b,retry){
   if(j.error==='auth'){if(!retry&&await relogin())return post(b,true);logout(true);throw new Error('auth')}return j}
 function logout(expired){
   if(API&&user&&!expired)fetch(API,{method:'POST',body:JSON.stringify({action:'logout',token:user.token})}).catch(()=>{});
-  user=null;store.del('user');refreshAuth();fillSaved();
+  user=null;SAV=[];store.del('user');refreshAuth();fillSaved();
   if(expired){$('lMsg').textContent='Phiên đăng nhập đã hết hạn hoặc tài khoản đã bị khóa. Đăng nhập lại để tiếp tục.';show('acc')}else show('dash');
 }
 $('btnLogin').onclick=async()=>{
@@ -381,7 +433,7 @@ $('btnLogin').onclick=async()=>{
     else{$('lMsg').textContent='Chế độ thử: đăng nhập bằng admin / admin.';return}
     store.set('user',JSON.stringify(user));
     if($('lRemember').checked)saveCred(u,p);else{store.del('cred');$('lPass').value=''}
-    refreshAuth();
+    refreshAuth();loadSavings();
     const k=pending;pending=null;k?go(k):show('home');
   }catch(e){if(e.message!=='auth')$('lMsg').textContent='Không kết nối được. Kiểm tra đường dẫn Google Sheet.'}
   finally{$('btnLogin').disabled=false;$('btnLogin').textContent='Đăng nhập'}
@@ -548,6 +600,74 @@ $('cList').onclick=async e=>{
     catch(x){cFail(x)}}
 };
 
+/* ---- gửi tiết kiệm ---- */
+let SAV=[],vTab='open',vEdit=null,vClose=null;
+const savTotal=()=>SAV.filter(x=>x.status==='open').reduce((s,x)=>s+x.amount,0);
+const isoD=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function addMonths(iso,m){const [y,mo,d]=iso.split('-').map(Number),last=new Date(y,mo+m,0).getDate();return isoD(new Date(y,mo-1+m,Math.min(d,last)))}
+const interest=(a,r,m)=>Math.round(a*r/100*m/12);
+const daysTo=iso=>{const [y,m,d]=iso.split('-').map(Number),n=new Date();return Math.round((new Date(y,m-1,d)-new Date(n.getFullYear(),n.getMonth(),n.getDate()))/864e5)};
+const pct=r=>String(r).replace('.',',')+'%/năm';
+const dueTag=iso=>{const d=daysTo(iso);return d<0?['st-over','Quá hạn '+(-d)+' ngày']:d===0?['st-locked','Đáo hạn hôm nay']:d<=30?['st-locked','Còn '+d+' ngày']:['st-active','Còn '+d+' ngày']};
+async function loadSavings(){
+  if(!user)return;
+  if(!API){try{SAV=JSON.parse(store.get('localSav')||'[]')}catch(e){SAV=[]}}
+  else{try{const j=await post({action:'listSavings'});if(j.ok)SAV=j.items}catch(e){}}
+  updateCore()}
+async function savCall(b){
+  if(API)return post(b);
+  const mk=x=>({bank:x.bank,book:x.book,amount:x.amount,rate:x.rate,term:x.term,start:x.start,maturity:addMonths(x.start,x.term),note:x.note}),i=SAV.findIndex(z=>z.id===b.id);
+  if(b.action==='addSaving')SAV.push({id:String(Date.now()),status:'open',closedDate:'',interest:0,...mk(b)});
+  else if(i<0)return{ok:false,error:'Không tìm thấy sổ tiết kiệm.'};
+  else if(SAV[i].status!=='open')return{ok:false,error:'Sổ đã tất toán là lịch sử nên không được sửa hoặc xóa.'};
+  else if(b.action==='updateSaving')Object.assign(SAV[i],mk(b));
+  else if(b.action==='closeSaving')Object.assign(SAV[i],{status:'closed',closedDate:b.date,interest:b.interest});
+  else if(b.action==='deleteSaving')SAV.splice(i,1);
+  store.set('localSav',JSON.stringify(SAV));return{ok:true}}
+async function savDo(body,msg){
+  $('vMsg').className='msg';
+  try{const j=await savCall(body);if(!j.ok){$('vMsg').textContent=j.error;return false}
+    await loadSavings();renderSav();$('vMsg').className='msg ok';$('vMsg').textContent=msg;return true}
+  catch(e){if(e.message!=='auth')$('vMsg').textContent='Chưa thực hiện được. Kiểm tra kết nối rồi thử lại.';return false}}
+function renderSav(){
+  const open=SAV.filter(x=>x.status==='open').sort((a,b)=>a.maturity.localeCompare(b.maturity));
+  $('vTotal').textContent=money(savTotal());
+  $('vInt').textContent=money(open.reduce((s,x)=>s+interest(x.amount,x.rate,x.term),0));
+  $('vNext').textContent=open.length?dmy(open[0].maturity)+' · '+esc(open[0].bank)+' · '+dueTag(open[0].maturity)[1]:'Chưa có sổ nào đang gửi';
+  $('vTabOpen').classList.toggle('on',vTab==='open');$('vTabClosed').classList.toggle('on',vTab==='closed');
+  const list=vTab==='open'?open:SAV.filter(x=>x.status==='closed').sort((a,b)=>b.closedDate.localeCompare(a.closedDate));
+  $('vList').innerHTML=list.length?list.map(x=>{const e=interest(x.amount,x.rate,x.term),id=esc(x.id),t=dueTag(x.maturity);
+    const head=`<b>${esc(x.bank)}</b><small>${x.book?'Sổ '+esc(x.book)+' · ':''}${x.term} tháng · ${pct(x.rate)}</small><small>Gửi ${dmy(x.start)} · Đáo hạn ${dmy(x.maturity)}</small>`;
+    return x.status==='open'
+      ?`<div class="cr sv"><div class="nm">${head}<span class="tag ${t[0]}">${t[1]}</span><small>Lãi dự kiến ${money(e)} · Nhận về ${money(x.amount+e)}</small>${x.note?`<small>${esc(x.note)}</small>`:''}</div>
+        <div class="a">${money(x.amount)}</div><div class="acts"><button data-a="close" data-id="${id}">Tất toán</button><button data-a="edit" data-id="${id}">Sửa</button><button data-a="del" data-id="${id}">Xóa</button></div></div>`
+      :`<div class="cr sv"><div class="nm">${head}<span class="tag st-hidden">Đã tất toán</span><small>Tất toán ${dmy(x.closedDate)} · Lãi thực nhận ${money(x.interest)}</small>${x.note?`<small>${esc(x.note)}</small>`:''}</div><div class="a">${money(x.amount)}</div></div>`}).join('')
+    :`<div class="empty">${vTab==='open'?'Chưa có sổ tiết kiệm nào đang gửi. Thêm sổ đầu tiên ở form bên cạnh hoặc bên dưới.':'Chưa có sổ nào được tất toán.'}</div>`}
+function calcSav(){const a=+$('sAmt').value,r=+$('sRate').value,t=parseInt($('sTerm').value,10),d=$('sStart').value,ok=a>0&&$('sRate').value!==''&&r>=0&&t>=1&&d;
+  $('sCalc').textContent=ok?`Đáo hạn ${dmy(addMonths(d,t))} · Lãi dự kiến ${money(interest(a,r,t))} · Nhận về ${money(a+interest(a,r,t))}`:'Nhập số tiền, lãi suất, kỳ hạn và ngày gửi để xem ngày đáo hạn và lãi dự kiến (tính lãi đơn).'}
+function resetSavForm(){vEdit=null;['sBank','sBook','sAmt','sRate','sTerm','sNote'].forEach(i=>$(i).value='');$('sStart').value=isoD(new Date());
+  $('vFormTitle').textContent='Thêm sổ tiết kiệm';$('btnSavSave').textContent='Lưu sổ tiết kiệm';$('btnSavCancel').style.display='none';$('sMsg').textContent='';calcSav()}
+['sAmt','sRate','sTerm','sStart'].forEach(i=>$(i).addEventListener('input',calcSav));
+$('vTabOpen').onclick=()=>{vTab='open';renderSav()};$('vTabClosed').onclick=()=>{vTab='closed';renderSav()};
+$('btnSavCancel').onclick=resetSavForm;
+$('btnSavSave').onclick=async()=>{
+  const b={action:vEdit?'updateSaving':'addSaving',id:vEdit,bank:$('sBank').value.trim(),book:$('sBook').value.trim(),amount:Number($('sAmt').value),rate:Number($('sRate').value),term:parseInt($('sTerm').value,10),start:$('sStart').value,note:$('sNote').value.trim()};
+  $('sMsg').className='msg';
+  if(!b.bank||!(b.amount>0)||$('sRate').value===''||!(b.rate>=0)||!(b.term>=1)||!b.start){$('sMsg').textContent='Nhập đủ ngân hàng, số tiền, lãi suất, kỳ hạn và ngày gửi.';return}
+  $('btnSavSave').disabled=true;const edit=!!vEdit;
+  const ok=await savDo(b,edit?'Đã lưu thay đổi.':'Đã thêm sổ tiết kiệm.');
+  $('btnSavSave').disabled=false;if(ok)resetSavForm()};
+$('vList').onclick=e=>{const b=e.target.closest('button[data-a]');if(!b)return;const x=SAV.find(z=>z.id===b.dataset.id);if(!x)return;$('vMsg').className='msg';$('vMsg').textContent='';
+  if(b.dataset.a==='edit'){vEdit=x.id;$('sBank').value=x.bank;$('sBook').value=x.book;$('sAmt').value=x.amount;$('sRate').value=x.rate;$('sTerm').value=x.term;$('sStart').value=x.start;$('sNote').value=x.note;
+    $('vFormTitle').textContent='Sửa sổ tiết kiệm';$('btnSavSave').textContent='Lưu thay đổi';$('btnSavCancel').style.display='block';$('sMsg').textContent='';calcSav();$('vForm').scrollIntoView({block:'start'})}
+  else if(b.dataset.a==='close'){vClose=x.id;$('dSetInfo').textContent=x.bank+' · '+money(x.amount)+' · đáo hạn '+dmy(x.maturity);
+    $('dDate').value=isoD(new Date());$('dInt').value=interest(x.amount,x.rate,x.term);$('dMsg').textContent='';$('dSet').showModal()}
+  else if(b.dataset.a==='del'){if(confirm('Xóa sổ tiết kiệm '+x.bank+' '+money(x.amount)+'?'))savDo({action:'deleteSaving',id:x.id},'Đã xóa sổ tiết kiệm.')}};
+$('dCancel').onclick=()=>$('dSet').close();
+$('dOk').onclick=async()=>{const d=$('dDate').value;
+  if(!d||$('dInt').value===''||Number($('dInt').value)<0){$('dMsg').textContent='Nhập ngày tất toán và lãi thực nhận (có thể bằng 0).';return}
+  if(await savDo({action:'closeSaving',id:vClose,date:d,interest:Number($('dInt').value)},'Đã tất toán sổ tiết kiệm.'))$('dSet').close()};
+
 /* ---- tổng hợp ---- */
 function bars(list,t,color){const by={};list.filter(r=>r.type===t).forEach(r=>by[r.cat]=(by[r.cat]||0)+r.amount);
   const tot=Object.values(by).reduce((a,b)=>a+b,0),e=Object.entries(by).sort((a,b)=>b[1]-a[1]);
@@ -688,8 +808,8 @@ document.addEventListener('pointerdown',e=>{
   s.style.cssText=`width:${d}px;height:${d}px;left:${e.clientX-r.left-d/2}px;top:${e.clientY-r.top-d/2}px`;
   h.appendChild(s);setTimeout(()=>s.remove(),600)});
 fillSaved();refreshAuth();load();
-if(user)show('home');
-else if(API&&getCred())relogin().then(ok=>{if(ok){refreshAuth();show('home')}});
+if(user){show('home');loadSavings()}
+else if(API&&getCred())relogin().then(ok=>{if(ok){refreshAuth();loadSavings();show('home')}});
 </script>
 </body>
 </html>
