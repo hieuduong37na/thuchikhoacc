@@ -160,22 +160,20 @@ dialog::backdrop{background:rgba(0,0,0,.65)}
 <body>
 <div class="app">
 <main>
-  <!-- Bảng điều khiển: ai cũng xem được -->
-  <section class="view on" id="v-dash">
-    <div class="top"><h2>Bảng thu chi của khoa</h2></div>
-    <div class="who"><span id="who"></span><button id="btnWho"></button></div>
+  <!-- Xem chi tiết thu chi (chỉ đọc): dành cho khách chưa đăng nhập -->
+  <section class="view" id="v-view">
+    <div class="top"><button class="back" data-go="home">Quay lại</button><h2 id="vwTitle"></h2></div>
     <div class="mon"><button id="mPrev" aria-label="Tháng trước">‹</button><input type="month" id="dMonth" aria-label="Chọn tháng"><button id="mNext" aria-label="Tháng sau">›</button></div>
     <div class="sum">
-      <div class="box"><small>Tổng thu</small><b class="in" id="dIn"></b></div>
-      <div class="box"><small>Tổng chi</small><b class="out" id="dOut"></b></div>
-      <div class="box wide"><small>Còn lại trong tháng</small><b id="dBal"></b></div>
+      <div class="box"><small id="vwLbl"></small><b id="vwTot"></b></div>
+      <div class="box"><small>Số khoản</small><b id="vwCnt"></b></div>
     </div>
-    <table class="t"><thead><tr><th>Ngày</th><th>Nội dung</th><th class="dk">Danh mục</th><th class="dk">Số hóa đơn</th><th class="dk">Người thực hiện</th><th class="n">Số tiền</th></tr></thead><tbody id="dRows"></tbody></table>
+    <table class="t"><thead><tr><th>Ngày</th><th>Nội dung</th><th class="dk">Danh mục</th><th class="dk">Số chứng từ</th><th class="dk">Người thực hiện</th><th class="n">Số tiền</th></tr></thead><tbody id="dRows"></tbody></table>
     <div class="status" id="dStatus"></div>
   </section>
 
   <!-- Ứng dụng: chỉ tài khoản đã đăng nhập -->
-  <section class="view" id="v-home">
+  <section class="view on" id="v-home">
     <div class="who homebar"><span id="hWho"></span><span style="display:flex;gap:6px"><button id="btnOut">Đăng xuất</button></span></div>
     <div class="stage" id="stage"><div class="core" aria-live="polite"><span class="cl">Tồn quỹ</span><b id="coreBal">0 đ</b></div></div>
   </section>
@@ -275,9 +273,9 @@ dialog::backdrop{background:rgba(0,0,0,.65)}
 
   <!-- Tài khoản -->
   <section class="view" id="v-acc">
-    <div class="top"><h2>Tài khoản</h2></div>
+    <div class="top"><button class="back" data-go="home">Quay lại</button><h2>Đăng nhập</h2></div>
     <div id="accOut">
-      <p class="empty" style="padding-top:0">Đăng nhập để vào ứng dụng nhập khoản thu, khoản chi và xuất báo cáo. Không đăng nhập vẫn xem được bảng thu chi.</p>
+      <p class="empty" style="padding-top:0">Đăng nhập để nhập khoản thu, khoản chi và dùng các chức năng quản lý. Không đăng nhập vẫn xem được các khoản thu, khoản chi (chỉ xem, không sửa được).</p>
       <label for="lUser">Tên đăng nhập</label><input id="lUser" autocomplete="username">
       <label for="lPass">Mật khẩu</label><input id="lPass" type="password" autocomplete="current-password">
       <label class="chk"><input type="checkbox" id="lRemember">Nhớ mật khẩu trên thiết bị này</label>
@@ -309,12 +307,6 @@ dialog::backdrop{background:rgba(0,0,0,.65)}
     </div></div>
   </section>
 </main>
-<nav class="tabs">
-  <div class="brand">Thu chi<br>nội bộ khoa</div>
-  <button class="tab on" data-tab="dash"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg>Bảng thu chi</button>
-  <div class="side" id="side"></div>
-  <button class="tab" data-tab="acc"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>Tài khoản</button>
-</nav>
 </div>
 <div id="printArea"></div>
 <dialog id="dSet">
@@ -334,6 +326,9 @@ dialog::backdrop{background:rgba(0,0,0,.65)}
 // Để trống thì ứng dụng chạy chế độ thử (dữ liệu chỉ lưu trong trình duyệt).
 const DEFAULT_API='https://script.google.com/macros/s/AKfycbzNd4EPCnp8DFyADRomoFcx8_WB30fPWCzw3ve0ZP-0cb88SwKKwbL7GEGwIc7F_p5Jng/exec';
 
+/* Chống nhân đôi giao diện (do tiện ích trình duyệt như dịch trang/đọc chế độ sao chép trang): chỉ giữ một khung .app */
+(function(){const dedupe=()=>document.querySelectorAll('.app').forEach((a,i)=>{if(i)a.remove()});dedupe();
+  try{new MutationObserver(dedupe).observe(document.body,{childList:true})}catch(e){}})();
 const $=id=>document.getElementById(id);
 const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}},del:k=>{try{localStorage.removeItem(k)}catch(e){}}};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -366,17 +361,14 @@ function updateCore(){const t=sumOf(rows,'Thu')-sumOf(rows,'Chi'),el=$('coreBal'
 try{matchMedia('(min-width:900px)').addEventListener('change',()=>updateCore())}catch(e){}
 function show(v){
   document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on',x.id==='v-'+v));
-  const t=v==='dash'?'dash':'acc';
-  document.querySelectorAll('.tab[data-tab]').forEach(x=>x.classList.toggle('on',x.dataset.tab===t));
-  const key=v==='form'?type:v;
-  document.querySelectorAll('.stab').forEach(x=>x.classList.toggle('on',x.dataset.k===key));
-  document.querySelector('.tabs').classList.toggle('sub',!!document.querySelector('.stab.on'));
-  if(v==='dash')renderDash();
+  if(v==='view')renderView();
   updateCore();
 }
 function needLogin(k,note){pending=k;$('lMsg').textContent=note||'Đăng nhập để dùng chức năng này.';show('acc');refreshAuth()}
+function openView(t){vwType=t;$('vwTitle').textContent=TXT[t].t;show('view')}
 function go(k){
-  if(!user)return needLogin(k);
+  if(k==='home')return show('home');
+  if(!user){if(k==='Chi'||k==='Thu')return openView(k);return needLogin(k)}
   if(k==='Chi'||k==='Thu')openForm(k);
   else if(k==='sum'){show('sum');renderSum()}
   else if(k==='rep'){show('rep');if(!$('rFrom').value&&!$('rTo').value)setRange('month');else renderRep();loadExcelJS().catch(()=>{})}
@@ -387,26 +379,21 @@ function go(k){
 }
 function buildStage(){
   document.querySelectorAll('#stage .item').forEach(x=>x.remove());
-  const list=APPS.filter(a=>!a.admin||(user&&user.role==='admin'));
+  const list=APPS.filter(a=>user?(!a.admin||user.role==='admin'):(a.go==='Chi'||a.go==='Thu'));
   list.forEach((a,k)=>{const ang=(-90+k*360/list.length)*Math.PI/180,R=38.5,b=document.createElement('button');
     b.className='item'+(a.amt?' amt':'');b.style.cssText=`left:${50+R*Math.cos(ang)}%;top:${50+R*Math.sin(ang)}%;--c:${a.c}${a.amt?';width:25%':''}`;
     b.innerHTML=`<span class="dot"><svg class="i" viewBox="0 0 24 24">${ICON[a.i]}</svg>${a.amt?`<span class="am" data-amt="${a.go}"></span>`:''}</span><span class="lbl">${a.n}</span>`;
     b.onclick=()=>go(a.go);$('stage').appendChild(b)});
-  $('side').innerHTML='';
-  (user?list:[]).forEach(a=>{const b=document.createElement('button');b.className='tab stab';b.dataset.k=a.go;
-    b.innerHTML=`<svg class="i" viewBox="0 0 24 24">${ICON[a.i]}</svg>${esc(a.side||a.n)}`;b.onclick=()=>go(a.go);$('side').appendChild(b)});
   updateCore();
 }
 document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>b.dataset.tab==='acc'&&user?show('home'):show(b.dataset.tab));
 
 /* ---- đăng nhập ---- */
 function refreshAuth(){
   const on=!!user;
-  $('hWho').textContent=on?user.name+(user.role==='admin'?' (quản trị)':''):'';
+  $('hWho').textContent=on?user.name+(user.role==='admin'?' (quản trị)':''):'Chế độ khách (chỉ xem)';
+  $('btnOut').textContent=on?'Đăng xuất':'Đăng nhập';
   buildStage();
-  $('who').textContent=on?'Xin chào, '+user.name:'Bạn đang xem ở chế độ khách';
-  $('btnWho').textContent=on?'Vào ứng dụng':'Đăng nhập';
 }
 const getCred=()=>{try{const c=store.get('cred');return c?JSON.parse(decodeURIComponent(escape(atob(c)))):null}catch(e){return null}};
 const saveCred=(u,p)=>store.set('cred',btoa(unescape(encodeURIComponent(JSON.stringify({u,p})))));
@@ -420,7 +407,7 @@ async function post(b,retry){
 function logout(expired){
   if(API&&user&&!expired)fetch(API,{method:'POST',body:JSON.stringify({action:'logout',token:user.token})}).catch(()=>{});
   user=null;SAV=[];store.del('user');refreshAuth();fillSaved();
-  if(expired){$('lMsg').textContent='Phiên đăng nhập đã hết hạn hoặc tài khoản đã bị khóa. Đăng nhập lại để tiếp tục.';show('acc')}else show('dash');
+  if(expired){$('lMsg').textContent='Phiên đăng nhập đã hết hạn hoặc tài khoản đã bị khóa. Đăng nhập lại để tiếp tục.';show('acc')}else show('home');
 }
 $('btnLogin').onclick=async()=>{
   const u=$('lUser').value.trim(),p=$('lPass').value;
@@ -439,8 +426,7 @@ $('btnLogin').onclick=async()=>{
   finally{$('btnLogin').disabled=false;$('btnLogin').textContent='Đăng nhập'}
 };
 $('lPass').onkeydown=e=>{if(e.key==='Enter')$('btnLogin').click()};
-$('btnOut').onclick=()=>logout();
-$('btnWho').onclick=()=>user?show('home'):needLogin(null,'');
+$('btnOut').onclick=()=>user?logout():needLogin(null,'');
 /* ---- quản lý tài khoản ---- */
 let USERS=[],uEdit=null;
 const ST={active:'Đang hoạt động',locked:'Đang khóa',hidden:'Đã ẩn'};
@@ -499,12 +485,12 @@ $('btnNew').onclick=async()=>{
 /* ---- dữ liệu ---- */
 async function load(){
   if(!API){try{rows=JSON.parse(store.get('localRows')||'[]')}catch(e){rows=[]}
-    try{const c=store.get('localCats');if(c)CATS=JSON.parse(c)}catch(e){}$('dStatus').textContent='Chế độ thử: dữ liệu lưu trong trình duyệt này.';renderDash();return}
+    try{const c=store.get('localCats');if(c)CATS=JSON.parse(c)}catch(e){}$('dStatus').textContent='Chế độ thử: dữ liệu lưu trong trình duyệt này.';renderView();return}
   $('dStatus').textContent='Đang tải dữ liệu...';
   try{const j=await(await fetch(API)).json();if(!j.ok)throw 0;rows=j.rows;if(j.cats&&j.cats.length){const m={Chi:[],Thu:[]};j.cats.forEach(c=>{if(m[c.type])m[c.type].push(c.name)});CATS=m}
     $('dStatus').textContent='Đã đồng bộ với Google Sheet.'}
   catch(e){$('dStatus').textContent='Không tải được dữ liệu. Kiểm tra đường dẫn Google Sheet và quyền truy cập.'}
-  renderDash();
+  renderView();
 }
 
 /* ---- dashboard theo tháng ---- */
@@ -512,18 +498,19 @@ const today=new Date(),curM=today.getFullYear()+'-'+String(today.getMonth()+1).p
 $('dMonth').value=curM;
 const sumOf=(a,t)=>a.filter(r=>r.type===t).reduce((s,r)=>s+r.amount,0);
 function shiftM(d){const [y,m]=($('dMonth').value||curM).split('-').map(Number),x=new Date(y,m-1+d,1);
-  $('dMonth').value=x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0');renderDash()}
-$('mPrev').onclick=()=>shiftM(-1);$('mNext').onclick=()=>shiftM(1);$('dMonth').onchange=renderDash;
-function renderDash(){
-  const m=$('dMonth').value||curM,f=rows.filter(r=>r.date.startsWith(m)).sort((a,b)=>b.date.localeCompare(a.date));
-  const i=sumOf(f,'Thu'),o=sumOf(f,'Chi');
-  $('dIn').textContent=money(i);$('dOut').textContent=money(o);$('dBal').textContent=money(i-o);$('dBal').className=i-o<0?'out':'in';
-  updateCore();
+  $('dMonth').value=x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0');renderView()}
+$('mPrev').onclick=()=>shiftM(-1);$('mNext').onclick=()=>shiftM(1);$('dMonth').onchange=renderView;
+let vwType='Chi';
+function renderView(){
+  const m=$('dMonth').value,t=vwType,f=rows.filter(r=>r.type===t&&(!m||r.date.startsWith(m))).sort((a,b)=>b.date.localeCompare(a.date));
+  $('vwLbl').textContent='Tổng '+TXT[t].t.toLowerCase()+(m?' trong tháng':'');
+  $('vwTot').textContent=money(sumOf(f,t));$('vwTot').className=t==='Thu'?'in':'out';$('vwCnt').textContent=f.length;
   $('dRows').innerHTML=f.length?f.map(r=>`<tr><td><span class="mo">${dmy(r.date).slice(0,5)}</span><span class="dk">${dmy(r.date)}</span></td>
-    <td>${esc(r.reason)}<small class="mo">${esc(r.cat)}${r.invoice?' · HĐ '+esc(r.invoice):''}${r.by?' · '+esc(r.by):''}</small></td>
+    <td>${esc(r.reason)}<small class="mo">${esc(r.cat)}${r.invoice?' · '+esc(r.invoice):''}${r.by?' · '+esc(r.by):''}</small></td>
     <td class="dk">${esc(r.cat)}</td><td class="dk">${esc(r.invoice)}</td><td class="dk">${esc(r.by)}</td>
-    <td class="n ${r.type==='Thu'?'in':'out'}">${r.type==='Thu'?'+':'−'}${money(r.amount)}</td></tr>`).join('')
-    :'<tr><td colspan="6" class="empty">Tháng này chưa có khoản thu chi nào.</td></tr>';
+    <td class="n ${t==='Thu'?'in':'out'}">${money(r.amount)}</td></tr>`).join('')
+    :`<tr><td colspan="6" class="empty">Chưa có ${TXT[t].t.toLowerCase()} nào${m?' trong tháng này':''}.</td></tr>`;
+  updateCore();
 }
 
 /* ---- form nhập ---- */
@@ -808,7 +795,8 @@ document.addEventListener('pointerdown',e=>{
   s.style.cssText=`width:${d}px;height:${d}px;left:${e.clientX-r.left-d/2}px;top:${e.clientY-r.top-d/2}px`;
   h.appendChild(s);setTimeout(()=>s.remove(),600)});
 fillSaved();refreshAuth();load();
-if(user){show('home');loadSavings()}
+show('home');
+if(user)loadSavings();
 else if(API&&getCred())relogin().then(ok=>{if(ok){refreshAuth();loadSavings();show('home')}});
 </script>
 </body>
