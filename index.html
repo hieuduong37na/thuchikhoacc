@@ -736,7 +736,7 @@ async function hoCall(b){
   store.set('localHo',JSON.stringify(HO));return{ok:true}}
 async function hoDo(body,msg){
   const els=[$('hMsg'),$('hoMsg')];els.forEach(e=>{e.className='msg';e.textContent=''});
-  try{const j=await hoCall(body);if(!j.ok){els.forEach(e=>e.textContent=j.error||'Chưa thực hiện được.');return false}
+  try{const j=await hoCall(body);if(!j.ok){els.forEach(e=>e.textContent=/không hợp lệ/i.test(j.error||'')?'Google Sheet chưa được cập nhật để hỗ trợ bàn giao quỹ. Cần thêm mã xử lý vào Apps Script rồi triển khai lại.':(j.error||'Chưa thực hiện được.'));return false}
     await loadHandovers();renderHo();$('hMsg').className='msg ok';$('hMsg').textContent=msg;return true}
   catch(e){if(e.message!=='auth')els.forEach(x=>x.textContent='Chưa thực hiện được. Kiểm tra kết nối rồi thử lại.');return false}}
 function renderHo(){
