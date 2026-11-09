@@ -285,7 +285,7 @@ dialog::backdrop{background:rgba(0,0,0,.65)}
       </div>
       <div id="hForm">
         <h3>Bàn giao quỹ cho người khác</h3>
-        <label for="hTo">Tên đăng nhập của người nhận</label><input id="hTo" autocomplete="off" maxlength="30">
+        <label for="hTo">Người nhận</label><select id="hTo"></select><input id="hToTxt" autocomplete="off" maxlength="30" placeholder="Tên đăng nhập của người nhận" style="display:none" aria-label="Tên đăng nhập của người nhận"><div class="status" id="hToHint" style="margin-top:4px"></div>
         <div class="two">
           <div><label for="hDate">Ngày bàn giao</label><input type="date" id="hDate"></div>
           <div><label for="hAmt">Số tiền bàn giao (đồng)</label><input id="hAmt" type="number" min="0" step="1000" inputmode="numeric"></div>
@@ -413,7 +413,7 @@ function go(k){
   else if(k==='sum'){show('sum');renderSum()}
   else if(k==='rep'){show('rep');if(!$('rFrom').value&&!$('rTo').value)setRange('month');else renderRep();loadExcelJS().catch(()=>{})}
   else if(k==='sav'){vTab='open';resetSavForm();show('sav');renderSav();loadSavings().then(renderSav)}
-  else if(k==='ho'){resetHoForm();show('ho');renderHo();loadHandovers().then(renderHo)}
+  else if(k==='ho'){resetHoForm();show('ho');renderHo();loadHandovers().then(renderHo);loadStaff()}
   else if(k==='cat'){cEdit=null;$('cMsg').textContent='';show('cat');renderCat()}
   else if(k==='users'){if(user.role!=='admin')return;resetUserForm();show('users');loadUsers()}
   else show(k);
@@ -447,7 +447,7 @@ async function post(b,retry){
   if(j.error==='auth'){if(!retry&&await relogin())return post(b,true);logout(true);throw new Error('auth')}return j}
 function logout(expired){
   if(API&&user&&!expired)fetch(API,{method:'POST',body:JSON.stringify({action:'logout',token:user.token})}).catch(()=>{});
-  user=null;SAV=[];HO=[];store.del('user');refreshAuth();fillSaved();
+  user=null;SAV=[];HO=[];STAFF=[];store.del('user');refreshAuth();fillSaved();
   if(expired){$('lMsg').textContent='Phiên đăng nhập đã hết hạn hoặc tài khoản đã bị khóa. Đăng nhập lại để tiếp tục.';show('acc')}else show('home');
 }
 $('btnLogin').onclick=async()=>{
@@ -697,7 +697,20 @@ $('dOk').onclick=async()=>{const d=$('dDate').value;
   if(await savDo({action:'closeSaving',id:vClose,date:d,interest:Number($('dInt').value)},'Đã tất toán sổ tiết kiệm.'))$('dSet').close()};
 
 /* ---- bàn giao quỹ ---- */
-let HO=[],hoAct=null;
+let HO=[],hoAct=null,STAFF=[];
+const nameOf=u=>(STAFF.find(s=>String(s.user).toLowerCase()===String(u).toLowerCase())||{}).name||u;
+function fillStaff(){const sel=$('hTo'),cur=sel.value,l=STAFF.filter(u=>String(u.user).toLowerCase()!==myU());
+  sel.innerHTML='<option value="">Chọn người nhận</option>'+l.map(u=>`<option value="${esc(u.user)}">${esc(u.name)} (${esc(u.user)})</option>`).join('');
+  if(l.some(u=>u.user===cur))sel.value=cur;
+  sel.style.display=l.length?'':'none';$('hToTxt').style.display=l.length?'none':'';
+  $('hToHint').textContent=l.length?'':'Chưa tải được danh sách người dùng, hãy nhập tên đăng nhập của người nhận.'}
+async function loadStaff(){
+  if(!user)return;
+  if(!API){STAFF=[{user:'nguyenvana',name:'Nguyễn Văn A (mẫu)'},{user:'tranthib',name:'Trần Thị B (mẫu)'}];fillStaff();return}
+  let l=null;
+  try{const j=await post({action:'listStaff'});if(j.ok&&j.users)l=j.users}catch(e){}
+  if(!l&&user&&user.role==='admin'){try{const j=await post({action:'listUsers'});if(j.ok)l=j.users.filter(u=>u.status==='active')}catch(e){}}
+  STAFF=l||[];fillStaff()}
 const HO_ST={pending:['st-locked','Chờ xác nhận'],confirmed:['st-active','Đã bàn giao'],rejected:['st-over','Bị từ chối'],cancelled:['st-hidden','Đã hủy']};
 const myU=()=>user?String(user.user).toLowerCase():'';
 const d10=s=>String(s||'').slice(0,10);
@@ -716,7 +729,7 @@ async function hoCall(b){
   const i=HO.findIndex(z=>z.id===b.id);
   if(b.action==='createHandover'){
     if(HO.some(hoIsOut))return{ok:false,error:'Bạn đang có một lần bàn giao chờ xác nhận.'};
-    HO.push({id:String(Date.now()),at:new Date().toISOString(),date:b.date,from:user.user,fromName:user.name,to:b.to,toName:b.to,amount:b.amount,book:b.book,note:b.note,status:'pending',doneAt:''})}
+    HO.push({id:String(Date.now()),at:new Date().toISOString(),date:b.date,from:user.user,fromName:user.name,to:b.to,toName:nameOf(b.to),amount:b.amount,book:b.book,note:b.note,status:'pending',doneAt:''})}
   else if(i<0)return{ok:false,error:'Không tìm thấy lần bàn giao này.'}
   else if(HO[i].status!=='pending')return{ok:false,error:'Lần bàn giao này đã được xử lý.'}
   else{HO[i].status={confirmHandover:'confirmed',rejectHandover:'rejected',cancelHandover:'cancelled'}[b.action];HO[i].doneAt=isoD(new Date())}
@@ -743,18 +756,18 @@ function renderHo(){
     :'<div class="empty">Chưa có lần bàn giao nào.</div>'}
 function calcHo(){const a=Number($('hAmt').value),b=fundBal(),has=$('hAmt').value!=='';
   $('hCalc').textContent='Tồn quỹ theo sổ: '+money(b)+(has?(a===b?' · Khớp với số tiền bàn giao.':' · Chênh lệch '+money(a-b)+' so với sổ, cần ghi lý do ở ghi chú.'):'')}
-function resetHoForm(){$('hTo').value='';$('hDate').value=isoD(new Date());$('hAmt').value=fundBal()>0?fundBal():'';$('hNote').value='';$('hfMsg').textContent='';calcHo()}
+function resetHoForm(){$('hTo').value='';$('hToTxt').value='';$('hDate').value=isoD(new Date());$('hAmt').value=fundBal()>0?fundBal():'';$('hNote').value='';$('hfMsg').textContent='';calcHo()}
 $('hAmt').addEventListener('input',calcHo);
 function openHoDialog(a,title,info,chk){hoAct=a;$('hoTitle').textContent=title;$('hoInfo').textContent=info;$('hoChkT').textContent=chk;$('hoChk').checked=false;$('hoMsg').textContent='';$('dHo').showModal()}
 $('btnHo').onclick=()=>{
-  const to=$('hTo').value.trim(),raw=$('hAmt').value,amount=Number(raw),date=$('hDate').value,note=$('hNote').value.trim(),book=fundBal(),m=$('hfMsg');m.className='msg';
+  const to=($('hTo').style.display==='none'?$('hToTxt'):$('hTo')).value.trim(),raw=$('hAmt').value,amount=Number(raw),date=$('hDate').value,note=$('hNote').value.trim(),book=fundBal(),m=$('hfMsg');m.className='msg';
   if(!to){m.textContent='Nhập tên đăng nhập của người nhận.';return}
   if(to.toLowerCase()===myU()){m.textContent='Không thể bàn giao cho chính mình.';return}
   if(!date||raw===''||!(amount>=0)){m.textContent='Nhập ngày bàn giao và số tiền (có thể bằng 0).';return}
   if(HO.some(hoIsOut)){m.textContent='Bạn đang có một lần bàn giao chờ xác nhận. Hủy lần đó trước khi tạo lần mới.';return}
   if(amount!==book&&!note){m.textContent='Số tiền khác tồn quỹ theo sổ. Nhập lý do chênh lệch ở ghi chú.';return}
   openHoDialog({kind:'create',body:{action:'createHandover',to,amount,book,date,note}},'Xác nhận bàn giao quỹ',
-    'Bàn giao '+money(amount)+' cho "'+to+'" ngày '+dmy(date)+'. Tồn quỹ theo sổ hiện tại là '+money(book)+'. Việc bàn giao hoàn tất khi người nhận xác nhận.',
+    'Bàn giao '+money(amount)+' cho "'+nameOf(to)+'" ngày '+dmy(date)+'. Tồn quỹ theo sổ hiện tại là '+money(book)+'. Việc bàn giao hoàn tất khi người nhận xác nhận.',
     'Tôi đã kiểm đếm số tiền trên và đồng ý bàn giao')};
 $('hList').onclick=async e=>{const b=e.target.closest('button[data-a]');if(!b)return;const x=HO.find(z=>String(z.id)===b.dataset.id);if(!x)return;
   $('hMsg').className='msg';$('hMsg').textContent='';
