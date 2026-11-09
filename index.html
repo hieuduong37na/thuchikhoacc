@@ -271,6 +271,34 @@ dialog::backdrop{background:rgba(0,0,0,.65)}
     <div class="status">Danh mục đã có khoản thu chi thì không xóa được. Vẫn sửa được tên, các khoản cũ sẽ đổi theo.</div>
   </section>
 
+  <!-- Bàn giao quỹ -->
+  <section class="view" id="v-ho">
+    <div class="top"><button class="back" data-go="home">Quay lại</button><h2>Bàn giao quỹ</h2></div>
+    <div class="sum">
+      <div class="box"><small>Tồn quỹ theo sổ</small><b id="hBal"></b></div>
+      <div class="box"><small>Người giữ quỹ hiện tại</small><b id="hHolder" style="font-size:16px"></b></div>
+    </div>
+    <div class="cols">
+      <div>
+        <div class="msg" id="hMsg" role="alert"></div>
+        <div id="hList"></div>
+      </div>
+      <div id="hForm">
+        <h3>Bàn giao quỹ cho người khác</h3>
+        <label for="hTo">Tên đăng nhập của người nhận</label><input id="hTo" autocomplete="off" maxlength="30">
+        <div class="two">
+          <div><label for="hDate">Ngày bàn giao</label><input type="date" id="hDate"></div>
+          <div><label for="hAmt">Số tiền bàn giao (đồng)</label><input id="hAmt" type="number" min="0" step="1000" inputmode="numeric"></div>
+        </div>
+        <div class="box" style="margin-top:12px"><small id="hCalc"></small></div>
+        <label for="hNote">Ghi chú</label><textarea id="hNote" rows="2"></textarea>
+        <div class="msg" id="hfMsg" role="alert"></div>
+        <button class="pri" id="btnHo">Bàn giao quỹ</button>
+        <div class="status">Việc bàn giao chỉ hoàn tất khi người nhận đăng nhập và xác nhận đã nhận đủ tiền. Trong lúc chờ, bạn vẫn là người giữ quỹ và có thể hủy.</div>
+      </div>
+    </div>
+  </section>
+
   <!-- Tài khoản -->
   <section class="view" id="v-acc">
     <div class="top"><button class="back" data-go="home">Quay lại</button><h2>Đăng nhập</h2></div>
@@ -320,6 +348,16 @@ dialog::backdrop{background:rgba(0,0,0,.65)}
     <button class="pri" id="dCancel" style="flex:1;width:auto;margin:0;background:transparent;border:1px solid var(--line)">Hủy</button>
   </div>
 </dialog>
+<dialog id="dHo">
+  <h3 style="margin-top:0" id="hoTitle"></h3>
+  <div class="status" id="hoInfo" style="margin-top:0;color:var(--txt)"></div>
+  <label class="chk"><input type="checkbox" id="hoChk"><span id="hoChkT"></span></label>
+  <div class="msg" id="hoMsg" role="alert"></div>
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <button class="pri" id="hoOk" style="flex:1;width:auto;margin:0">Xác nhận</button>
+    <button class="pri" id="hoCancel" style="flex:1;width:auto;margin:0;background:transparent;border:1px solid var(--line)">Hủy</button>
+  </div>
+</dialog>
 
 <script>
 // ĐƯỜNG DẪN GOOGLE SHEET: dán đường dẫn Web app (kết thúc bằng /exec) vào giữa hai dấu nháy bên dưới.
@@ -343,9 +381,11 @@ const ICON={up:'<path d="M12 19V5M5 12l7-7 7 7"/>',down:'<path d="M12 5v14M5 12l
  bars:'<path d="M5 20V11M12 20V4M19 20v-6"/>',file:'<path d="M6 3h9l4 4v14H6z"/><path d="M12 11v6M9 14l3 3 3-3"/>',
  users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-4 3-6 6.5-6s6.5 2 6.5 6"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14c3 0 4.5 2 4.5 5"/>',
  bank:'<path d="M3 10l9-6 9 6z"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 21h18"/>',
- tag:'<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2"/>'};
+ tag:'<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2"/>',
+ swap:'<path d="M4 8h14l-3-3M20 16H6l3 3"/>'};
 const APPS=[{n:'Khoản chi',i:'up',c:'#ff6a5e',go:'Chi',amt:true},{n:'Khoản thu',i:'down',c:'#2fbf71',go:'Thu',amt:true},
             {n:'Gửi tiết kiệm',i:'bank',c:'#ff8fb1',go:'sav',amt:true},
+            {n:'Bàn giao quỹ',i:'swap',c:'#ff9f43',go:'ho'},
             {n:'Tổng hợp',i:'bars',c:'#3d8bff',go:'sum'},{n:'Xuất báo cáo',i:'file',c:'#a66cff',go:'rep'},
             {n:'Danh mục',i:'tag',c:'#f2b21a',go:'cat'},
             {n:'Tài khoản',side:'Quản lý tài khoản',i:'users',c:'#26c6b0',go:'users',admin:true}];
@@ -353,7 +393,7 @@ let API=DEFAULT_API,rows=[],type='Chi',pending=null,user=null;
 try{user=JSON.parse(store.get('user')||'null')}catch(e){}
 
 /* ---- điều hướng ---- */
-function updateCore(){const t=sumOf(rows,'Thu')-sumOf(rows,'Chi'),el=$('coreBal'),x=money(t);
+function updateCore(){hoBadge();const t=sumOf(rows,'Thu')-sumOf(rows,'Chi'),el=$('coreBal'),x=money(t);
   el.textContent=x;el.classList.toggle('neg',t<0);
   const kd=matchMedia('(min-width:900px)').matches?1.5:1;
   document.querySelectorAll('[data-amt]').forEach(e=>{const y=money(e.dataset.amt==='sav'?savTotal():sumOf(rows,e.dataset.amt));e.textContent=y;e.style.fontSize=(y.length<=9?13:y.length<=11?12:y.length<=13?10.5:8.5)*kd+'px'});
@@ -373,6 +413,7 @@ function go(k){
   else if(k==='sum'){show('sum');renderSum()}
   else if(k==='rep'){show('rep');if(!$('rFrom').value&&!$('rTo').value)setRange('month');else renderRep();loadExcelJS().catch(()=>{})}
   else if(k==='sav'){vTab='open';resetSavForm();show('sav');renderSav();loadSavings().then(renderSav)}
+  else if(k==='ho'){resetHoForm();show('ho');renderHo();loadHandovers().then(renderHo)}
   else if(k==='cat'){cEdit=null;$('cMsg').textContent='';show('cat');renderCat()}
   else if(k==='users'){if(user.role!=='admin')return;resetUserForm();show('users');loadUsers()}
   else show(k);
@@ -382,7 +423,7 @@ function buildStage(){
   const list=APPS.filter(a=>user?(!a.admin||user.role==='admin'):(a.go==='Chi'||a.go==='Thu'));
   list.forEach((a,k)=>{const ang=(-90+k*360/list.length)*Math.PI/180,R=38.5,b=document.createElement('button');
     b.className='item'+(a.amt?' amt':'');b.style.cssText=`left:${50+R*Math.cos(ang)}%;top:${50+R*Math.sin(ang)}%;--c:${a.c}${a.amt?';width:25%':''}`;
-    b.innerHTML=`<span class="dot"><svg class="i" viewBox="0 0 24 24">${ICON[a.i]}</svg>${a.amt?`<span class="am" data-amt="${a.go}"></span>`:''}</span><span class="lbl">${a.n}</span>`;
+    b.innerHTML=`<span class="dot"><svg class="i" viewBox="0 0 24 24">${ICON[a.i]}</svg>${a.amt?`<span class="am" data-amt="${a.go}"></span>`:''}</span><span class="lbl" data-lbl="${a.go}">${a.n}</span>`;
     b.onclick=()=>go(a.go);$('stage').appendChild(b)});
   updateCore();
 }
@@ -406,7 +447,7 @@ async function post(b,retry){
   if(j.error==='auth'){if(!retry&&await relogin())return post(b,true);logout(true);throw new Error('auth')}return j}
 function logout(expired){
   if(API&&user&&!expired)fetch(API,{method:'POST',body:JSON.stringify({action:'logout',token:user.token})}).catch(()=>{});
-  user=null;SAV=[];store.del('user');refreshAuth();fillSaved();
+  user=null;SAV=[];HO=[];store.del('user');refreshAuth();fillSaved();
   if(expired){$('lMsg').textContent='Phiên đăng nhập đã hết hạn hoặc tài khoản đã bị khóa. Đăng nhập lại để tiếp tục.';show('acc')}else show('home');
 }
 $('btnLogin').onclick=async()=>{
@@ -420,7 +461,7 @@ $('btnLogin').onclick=async()=>{
     else{$('lMsg').textContent='Chế độ thử: đăng nhập bằng admin / admin.';return}
     store.set('user',JSON.stringify(user));
     if($('lRemember').checked)saveCred(u,p);else{store.del('cred');$('lPass').value=''}
-    refreshAuth();loadSavings();
+    refreshAuth();loadSavings();loadHandovers();
     const k=pending;pending=null;k?go(k):show('home');
   }catch(e){if(e.message!=='auth')$('lMsg').textContent='Không kết nối được. Kiểm tra đường dẫn Google Sheet.'}
   finally{$('btnLogin').disabled=false;$('btnLogin').textContent='Đăng nhập'}
@@ -655,6 +696,79 @@ $('dOk').onclick=async()=>{const d=$('dDate').value;
   if(!d||$('dInt').value===''||Number($('dInt').value)<0){$('dMsg').textContent='Nhập ngày tất toán và lãi thực nhận (có thể bằng 0).';return}
   if(await savDo({action:'closeSaving',id:vClose,date:d,interest:Number($('dInt').value)},'Đã tất toán sổ tiết kiệm.'))$('dSet').close()};
 
+/* ---- bàn giao quỹ ---- */
+let HO=[],hoAct=null;
+const HO_ST={pending:['st-locked','Chờ xác nhận'],confirmed:['st-active','Đã bàn giao'],rejected:['st-over','Bị từ chối'],cancelled:['st-hidden','Đã hủy']};
+const myU=()=>user?String(user.user).toLowerCase():'';
+const d10=s=>String(s||'').slice(0,10);
+const fundBal=()=>sumOf(rows,'Thu')-sumOf(rows,'Chi');
+/* Chế độ thử chỉ có một tài khoản nên được tự xác nhận; chế độ thật chỉ người nhận mới xác nhận được */
+const hoIsIn=x=>x.status==='pending'&&(!API||String(x.to).toLowerCase()===myU());
+const hoIsOut=x=>x.status==='pending'&&String(x.from).toLowerCase()===myU();
+function hoBadge(){const n=user?HO.filter(hoIsIn).length:0;document.querySelectorAll('[data-lbl="ho"]').forEach(e=>e.textContent='Bàn giao quỹ'+(n?' ('+n+')':''))}
+async function loadHandovers(){
+  if(!user)return;
+  if(!API){try{HO=JSON.parse(store.get('localHo')||'[]')}catch(e){HO=[]}}
+  else{try{const j=await post({action:'listHandovers'});if(j.ok)HO=j.items||[]}catch(e){}}
+  updateCore()}
+async function hoCall(b){
+  if(API)return post(b);
+  const i=HO.findIndex(z=>z.id===b.id);
+  if(b.action==='createHandover'){
+    if(HO.some(hoIsOut))return{ok:false,error:'Bạn đang có một lần bàn giao chờ xác nhận.'};
+    HO.push({id:String(Date.now()),at:new Date().toISOString(),date:b.date,from:user.user,fromName:user.name,to:b.to,toName:b.to,amount:b.amount,book:b.book,note:b.note,status:'pending',doneAt:''})}
+  else if(i<0)return{ok:false,error:'Không tìm thấy lần bàn giao này.'}
+  else if(HO[i].status!=='pending')return{ok:false,error:'Lần bàn giao này đã được xử lý.'}
+  else{HO[i].status={confirmHandover:'confirmed',rejectHandover:'rejected',cancelHandover:'cancelled'}[b.action];HO[i].doneAt=isoD(new Date())}
+  store.set('localHo',JSON.stringify(HO));return{ok:true}}
+async function hoDo(body,msg){
+  const els=[$('hMsg'),$('hoMsg')];els.forEach(e=>{e.className='msg';e.textContent=''});
+  try{const j=await hoCall(body);if(!j.ok){els.forEach(e=>e.textContent=j.error||'Chưa thực hiện được.');return false}
+    await loadHandovers();renderHo();$('hMsg').className='msg ok';$('hMsg').textContent=msg;return true}
+  catch(e){if(e.message!=='auth')els.forEach(x=>x.textContent='Chưa thực hiện được. Kiểm tra kết nối rồi thử lại.');return false}}
+function renderHo(){
+  $('hBal').textContent=money(fundBal());
+  const done=HO.filter(x=>x.status==='confirmed').sort((a,b)=>String(b.doneAt).localeCompare(String(a.doneAt))||String(b.at).localeCompare(String(a.at)))[0];
+  $('hHolder').textContent=done?done.toName+(done.doneAt?' · từ '+dmy(d10(done.doneAt)):''):'Chưa có bàn giao nào';
+  const list=[...HO].sort((a,b)=>(hoIsIn(b)-hoIsIn(a))||String(b.at||b.date).localeCompare(String(a.at||a.date)));
+  $('hList').innerHTML=list.length?list.map(x=>{
+    const s=HO_ST[x.status]||['st-hidden',esc(x.status)],id=esc(x.id),inc=hoIsIn(x),book=x.book===''||x.book==null?null:Number(x.book),amt=Number(x.amount);
+    const acts=(inc?`<button data-a="recv" data-id="${id}">Xác nhận đã nhận</button><button data-a="rej" data-id="${id}">Từ chối</button>`:'')+(hoIsOut(x)?`<button data-a="cancel" data-id="${id}">Hủy bàn giao</button>`:'');
+    return `<div class="cr sv"><div class="nm"><b>${esc(x.fromName)} → ${esc(x.toName)}</b><small>Ngày bàn giao ${dmy(d10(x.date))}</small>
+      <span class="tag ${s[0]}">${inc?'Chờ bạn xác nhận':s[1]}</span>
+      ${book!==null&&book!==amt?`<small>Tồn quỹ theo sổ lúc giao ${money(book)} · chênh lệch ${money(amt-book)}</small>`:''}
+      ${x.status==='confirmed'||x.status==='rejected'||x.status==='cancelled'?`<small>${x.status==='confirmed'?'Đã nhận':x.status==='rejected'?'Bị từ chối':'Đã hủy'} ngày ${dmy(d10(x.doneAt))}</small>`:''}
+      ${x.note?`<small>${esc(x.note)}</small>`:''}</div>
+      <div class="a">${money(amt)}</div>${acts?`<div class="acts">${acts}</div>`:''}</div>`}).join('')
+    :'<div class="empty">Chưa có lần bàn giao nào.</div>'}
+function calcHo(){const a=Number($('hAmt').value),b=fundBal(),has=$('hAmt').value!=='';
+  $('hCalc').textContent='Tồn quỹ theo sổ: '+money(b)+(has?(a===b?' · Khớp với số tiền bàn giao.':' · Chênh lệch '+money(a-b)+' so với sổ, cần ghi lý do ở ghi chú.'):'')}
+function resetHoForm(){$('hTo').value='';$('hDate').value=isoD(new Date());$('hAmt').value=fundBal()>0?fundBal():'';$('hNote').value='';$('hfMsg').textContent='';calcHo()}
+$('hAmt').addEventListener('input',calcHo);
+function openHoDialog(a,title,info,chk){hoAct=a;$('hoTitle').textContent=title;$('hoInfo').textContent=info;$('hoChkT').textContent=chk;$('hoChk').checked=false;$('hoMsg').textContent='';$('dHo').showModal()}
+$('btnHo').onclick=()=>{
+  const to=$('hTo').value.trim(),raw=$('hAmt').value,amount=Number(raw),date=$('hDate').value,note=$('hNote').value.trim(),book=fundBal(),m=$('hfMsg');m.className='msg';
+  if(!to){m.textContent='Nhập tên đăng nhập của người nhận.';return}
+  if(to.toLowerCase()===myU()){m.textContent='Không thể bàn giao cho chính mình.';return}
+  if(!date||raw===''||!(amount>=0)){m.textContent='Nhập ngày bàn giao và số tiền (có thể bằng 0).';return}
+  if(HO.some(hoIsOut)){m.textContent='Bạn đang có một lần bàn giao chờ xác nhận. Hủy lần đó trước khi tạo lần mới.';return}
+  if(amount!==book&&!note){m.textContent='Số tiền khác tồn quỹ theo sổ. Nhập lý do chênh lệch ở ghi chú.';return}
+  openHoDialog({kind:'create',body:{action:'createHandover',to,amount,book,date,note}},'Xác nhận bàn giao quỹ',
+    'Bàn giao '+money(amount)+' cho "'+to+'" ngày '+dmy(date)+'. Tồn quỹ theo sổ hiện tại là '+money(book)+'. Việc bàn giao hoàn tất khi người nhận xác nhận.',
+    'Tôi đã kiểm đếm số tiền trên và đồng ý bàn giao')};
+$('hList').onclick=async e=>{const b=e.target.closest('button[data-a]');if(!b)return;const x=HO.find(z=>String(z.id)===b.dataset.id);if(!x)return;
+  $('hMsg').className='msg';$('hMsg').textContent='';
+  if(b.dataset.a==='recv')openHoDialog({kind:'recv',id:x.id},'Xác nhận đã nhận quỹ',
+    x.fromName+' bàn giao quỹ cho bạn: '+money(Number(x.amount))+' (ngày '+dmy(d10(x.date))+').'+(x.note?' Ghi chú: '+x.note:''),'Tôi đã kiểm đếm và nhận đủ số tiền trên');
+  else if(b.dataset.a==='rej'){if(confirm('Từ chối nhận bàn giao '+money(Number(x.amount))+' từ '+x.fromName+'?'))hoDo({action:'rejectHandover',id:x.id},'Đã từ chối nhận bàn giao.')}
+  else if(b.dataset.a==='cancel'){if(confirm('Hủy lần bàn giao '+money(Number(x.amount))+' cho '+x.toName+'?'))hoDo({action:'cancelHandover',id:x.id},'Đã hủy lần bàn giao.')}};
+$('hoCancel').onclick=()=>$('dHo').close();
+$('hoOk').onclick=async()=>{
+  if(!$('hoChk').checked){$('hoMsg').textContent='Tích ô xác nhận trước khi tiếp tục.';return}
+  const a=hoAct;if(!a)return;$('hoOk').disabled=true;
+  const ok=await hoDo(a.kind==='create'?a.body:{action:'confirmHandover',id:a.id},a.kind==='create'?'Đã gửi yêu cầu bàn giao. Chờ người nhận xác nhận.':'Đã xác nhận nhận bàn giao quỹ.');
+  $('hoOk').disabled=false;if(ok){$('dHo').close();if(a.kind==='create')resetHoForm()}};
+
 /* ---- tổng hợp ---- */
 function bars(list,t,color){const by={};list.filter(r=>r.type===t).forEach(r=>by[r.cat]=(by[r.cat]||0)+r.amount);
   const tot=Object.values(by).reduce((a,b)=>a+b,0),e=Object.entries(by).sort((a,b)=>b[1]-a[1]);
@@ -796,8 +910,8 @@ document.addEventListener('pointerdown',e=>{
   h.appendChild(s);setTimeout(()=>s.remove(),600)});
 fillSaved();refreshAuth();load();
 show('home');
-if(user)loadSavings();
-else if(API&&getCred())relogin().then(ok=>{if(ok){refreshAuth();loadSavings();show('home')}});
+if(user){loadSavings();loadHandovers()}
+else if(API&&getCred())relogin().then(ok=>{if(ok){refreshAuth();loadSavings();loadHandovers();show('home')}});
 </script>
 </body>
 </html>
